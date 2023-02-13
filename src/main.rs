@@ -36,7 +36,7 @@ use rocket::http::ContentType;
 use rocket::response::Responder;
 use rocket::{http, Data, Response, State};
 
-const jwt_secret: String = "hewwo-uwu".to_string();
+pub const jwt_secret: &str = "hewwo-uwu";
 
 fn rocket() -> rocket::Rocket {
 	dotenv().ok();
@@ -51,7 +51,9 @@ fn rocket() -> rocket::Rocket {
 			"/api/v1/",
 			routes![
 				get_all,
-				new_user,
+				register,
+				get_me,
+				login,
 				find_user,
 				authorize,
 				authorize_consent,

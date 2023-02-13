@@ -1,12 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::jwt_secret;
 use chrono::{Duration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use oxide_auth::primitives::generator;
 use oxide_auth::primitives::grant::Grant;
 use oxide_auth::primitives::issuer::{IssuedToken, Issuer};
 use oxide_auth::primitives::issuer::{RefreshedToken, TokenType};
 use oxide_auth::primitives::prelude::{RandomGenerator, TagGrant, TokenMap};
+
+mod utils;
 
 struct Token {
 	/// Back link to the access token.
@@ -47,7 +51,18 @@ pub struct JwtIssuer {
 
 impl JwtIssuer {
 	fn access_token(&mut self, grant: &Grant) -> String {
-		return "Hewwo".to_string();
+		println!("{}", grant.owner_id);
+		utils::jwt_from_id(grant.owner_id.clone(), grant.until.timestamp() as usize)
+		// let claims = Claims {
+		// 	sub: grant.owner_id.clone(),
+		// 	exp: grant.until.timestamp() as usize,
+		// };
+		// let token = encode(
+		// 	&Header::default(),
+		// 	&claims,
+		// 	&EncodingKey::from_secret(jwt_secret.as_ref()),
+		// );
+		// return token.unwrap();
 	}
 	pub fn new(generator: RandomGenerator) -> Self {
 		Self {

@@ -1,6 +1,8 @@
 use super::db::Conn as DbConn;
 use super::models::{NewUser, User};
-use crate::models::UserData;
+use crate::jwt_secret;
+use crate::models::{Device, LoginUser, UserData};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use rocket_contrib::json::Json;
 use serde_json::Value;
 
@@ -12,13 +14,15 @@ use oxide_auth::frontends::simple::endpoint::{FnSolicitor, Generic, Vacant};
 use oxide_auth::primitives::prelude::*;
 use oxide_auth::primitives::registrar::RegisteredUrl;
 use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
-
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, Cookie, Cookies, SameSite, Status};
 use rocket::response::{Redirect, Responder};
 use rocket::{http, Data, Response, State};
 
+const session_string: &str = "session-token";
 #[path = "./jwt_issuer.rs"]
 mod JwtIssuer;
+#[path = "./utils.rs"]
+mod utils;
 pub struct MyState {
 	registrar: Mutex<ClientMap>,
 	authorizer: Mutex<AuthMap<RandomGenerator>>,
@@ -43,12 +47,37 @@ pub fn authorize_consent<'r>(
 	oauth: OAuthRequest<'r>,
 	allow: Option<bool>,
 	state: State<MyState>,
+	mut cookies: Cookies,
 ) -> Result<OAuthResponse<'r>, OAuthFailure> {
 	let allowed = allow.unwrap_or(false);
+	let user_id = cookies.get(session_string);
+	if user_id.is_none() {
+		return state
+			.endpoint()
+			.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
+				consent_decision(allowed, grant, "-1".to_string())
+			}))
+			.authorization_flow()
+			.execute(oauth)
+			.map_err(|err| err.pack::<OAuthFailure>());
+	}
+	let claims = utils::claim_form_jwt(user_id.unwrap().value().to_string());
+	if claims.is_none() {
+		return state
+			.endpoint()
+			.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
+				consent_decision(allowed, grant, "-1".to_string())
+			}))
+			.authorization_flow()
+			.execute(oauth)
+			.map_err(|err| err.pack::<OAuthFailure>());
+	}
+	let user_id = claims.unwrap().sub;
+	println!("{}", user_id);
 	state
 		.endpoint()
 		.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
-			consent_decision(allowed, grant)
+			consent_decision(allowed, grant, user_id.clone())
 		}))
 		.authorization_flow()
 		.execute(oauth)
@@ -81,6 +110,18 @@ pub fn refresh<'r>(
 		.refresh_flow()
 		.execute(oauth)
 		.map_err(|err| err.pack::<OAuthFailure>())
+}
+
+// Returns the devices owned by the user
+#[get("/devices")]
+pub fn get_devices(mut cookies: Cookies, conn: DbConn) -> Json<Value> {
+	let cookie = cookies.get(session_string);
+	let user_id = utils::get_user_id_from_cookie(cookie);
+	if (user_id.is_none()) {
+		return Json(json!({"error":"not logged in"}));
+	}
+	let devices = Device::get_devices_by_user(user_id.unwrap(), &conn);
+	return Json(json! ({"status":200,"devices":devices}));
 }
 
 #[get("/")]
@@ -123,20 +164,105 @@ pub fn get_all(conn: DbConn) -> Json<Value> {
 	}))
 }
 
-#[post("/newUser", format = "application/json", data = "<new_user>")]
-pub fn new_user(conn: DbConn, new_user: Json<NewUser>) -> Json<Value> {
-	let status = User::insert_user(new_user.into_inner(), &conn);
+#[post("/register", format = "application/json", data = "<new_user>")]
+pub fn register(conn: DbConn, new_user: Json<NewUser>, mut cookies: Cookies) -> Json<Value> {
+	let status = User::insert_user(new_user.clone(), &conn);
+	if !status {
+		return Json(json!({"error":"failed to create a user"}));
+	}
+	let email = new_user.email.clone();
+	let user_list = User::get_user_by_email(email, &conn);
+	let user = user_list.first();
+	return match user {
+		Some(user) => {
+			let user_id = user.id.to_string();
+			let session_cookie = Cookie::build(
+				session_string,
+				utils::jwt_from_id(
+					user_id.clone(),
+					(chrono::Utc::now().timestamp() + 365 * 24 * 60 * 60) as usize,
+				),
+			)
+			.path("/")
+			.same_site(SameSite::Strict)
+			.http_only(true)
+			.finish();
+			cookies.add(session_cookie);
+			Json(json!({
+				"status": status,
+				"result": "success",
+			}))
+		}
+		None => Json(json!({"error":"failed to find the user"})),
+	};
+}
+
+// Login the user and send them a jwt containing their user_id
+#[post("/login", format = "application/json", data = "<user_data>")]
+pub fn login(user_data: Json<LoginUser>, conn: DbConn, mut cookies: Cookies) -> Json<Value> {
+	let user = User::get_user_by_email(user_data.clone().email, &conn);
+	// Check if user with given email exists
+	if user.first().is_none() {
+		return Json(json!({
+			"error":"invalid email"
+		}));
+	}
+	// Check if password match
+	// TODO implement password hashing
+	if user.first().unwrap().password != user_data.password {
+		return Json(json!({
+			"error":"invalid password"
+		}));
+	}
+	let user_id = user.first().unwrap().id.to_string();
+	let session_cookie = Cookie::build(
+		session_string,
+		utils::jwt_from_id(
+			user_id.clone(),
+			(chrono::Utc::now().timestamp() + 365 * 24 * 60 * 60) as usize,
+		),
+	)
+	.path("/")
+	.same_site(SameSite::Strict)
+	.http_only(true)
+	.finish();
+	cookies.add(session_cookie);
+	return Json(json!({
+		"status":200
+	}));
+}
+#[get("/me", format = "application/json")]
+pub fn get_me(conn: DbConn, mut cookies: Cookies) -> Json<Value> {
+	let jwt = cookies.get(session_string);
+	if jwt.is_none() {
+		return Json(json!({"error":"not logged in"}));
+	}
+	// `token` is a struct with 2 fields: `header` and `claims` where `claims` is your own struct.
+	let token = utils::claim_form_jwt(jwt.unwrap().value().to_string());
+	if token.is_none() {
+		return Json(json!({
+			"status": 401,
+			"error": "invalid jwt",
+		}));
+	}
+	let user_id_int: i32 = token.unwrap().sub.parse().unwrap();
+	println!("{}", user_id_int);
+	let user = User::get_user_by_id(user_id_int, &conn);
+	if user.first().is_none() {
+		return Json(json!({"error":"invalid user_id"}));
+	}
 	Json(json!({
-		"status": status,
-		"result": User::get_all_users(&conn).first(),
+		"status": 200,
+		"result": user,
 	}))
 }
 
 #[post("/getUser", format = "application/json", data = "<user_data>")]
 pub fn find_user(conn: DbConn, user_data: Json<UserData>) -> Json<Value> {
+	let email = user_data.email.clone();
 	Json(json!({
 		"status": 200,
-		"result": User::get_user_by_username(user_data.into_inner(),&conn),
+		"result": User::get_user_by_email(email,&conn),
 	}))
 }
 
@@ -198,9 +324,13 @@ fn consent_form<'r>(
 	)
 }
 
-fn consent_decision<'r>(allowed: bool, _: Solicitation) -> OwnerConsent<OAuthResponse<'r>> {
+fn consent_decision<'r>(
+	allowed: bool,
+	_: Solicitation,
+	user_id: String,
+) -> OwnerConsent<OAuthResponse<'r>> {
 	if allowed {
-		OwnerConsent::Authorized("dummy user".into())
+		OwnerConsent::Authorized(user_id.into())
 	} else {
 		OwnerConsent::Denied
 	}

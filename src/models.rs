@@ -27,8 +27,14 @@ pub struct Device {
 pub struct UserData {
 	pub email: String,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LoginUser {
+	pub email: String,
+	pub password: String,
+}
 // this is to insert users to database
-#[derive(Serialize, Deserialize, Insertable)]
+#[derive(Serialize, Deserialize, Insertable, Clone)]
 #[table_name = "users"]
 pub struct NewUser {
 	pub email: String,
@@ -61,9 +67,15 @@ impl User {
 			.is_ok()
 	}
 
-	pub fn get_user_by_username(user: UserData, conn: &PgConnection) -> Vec<User> {
+	pub fn get_user_by_email(email: String, conn: &PgConnection) -> Vec<User> {
 		all_users
-			.filter(users::email.eq(user.email))
+			.filter(users::email.eq(email))
+			.load::<User>(conn)
+			.expect("error!")
+	}
+	pub fn get_user_by_id(id: i32, conn: &PgConnection) -> Vec<User> {
+		all_users
+			.filter(users::id.eq(id))
 			.load::<User>(conn)
 			.expect("error!")
 	}
@@ -84,9 +96,9 @@ impl Device {
 			.is_ok()
 	}
 
-	pub fn get_devices_by_user(user: User, conn: &mut PgConnection) -> Vec<Device> {
+	pub fn get_devices_by_user(user_id: i32, conn: &PgConnection) -> Vec<Device> {
 		all_devices
-			.filter(devices::user_id.eq(user.id))
+			.filter(devices::user_id.eq(user_id))
 			.load::<Device>(conn)
 			.expect("error!")
 	}
