@@ -4,6 +4,7 @@ use super::schema::{devices, users};
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use uuid::Uuid;
 // this is to get users from the database
 #[derive(Serialize, Queryable)]
 pub struct User {
@@ -14,12 +15,13 @@ pub struct User {
 	pub last_name: String,
 }
 
-#[derive(Serialize, Queryable)]
+#[derive(Serialize, Deserialize, Queryable)]
 #[diesel(belongs_to(User))]
 pub struct Device {
-	pub id: i32,
+	pub id: Uuid,
 	pub type_: String,
 	pub user_id: i32,
+	pub secret: String,
 }
 
 // decode request data
@@ -47,9 +49,10 @@ pub struct NewUser {
 #[derive(Serialize, Deserialize, Insertable)]
 #[table_name = "devices"]
 pub struct NewDevice {
-	pub id: i32,
+	pub id: Uuid,
 	pub type_: String,
 	pub user_id: i32,
+	pub secret: String,
 }
 
 impl User {

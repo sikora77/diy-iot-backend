@@ -2,10 +2,11 @@
 
 diesel::table! {
     devices (id) {
-        id -> Int4,
+        id -> Uuid,
         #[sql_name = "type"]
         type_ -> Varchar,
         user_id -> Int4,
+        secret -> Varchar,
     }
 }
 

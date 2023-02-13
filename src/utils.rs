@@ -1,7 +1,7 @@
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use rocket::http::Cookie;
 
-use crate::jwt_secret;
+use crate::JWT_SECRET;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
@@ -17,7 +17,7 @@ pub fn jwt_from_id(user_id: String, timestamp: usize) -> String {
 	let token = encode(
 		&Header::default(),
 		&claims,
-		&EncodingKey::from_secret(jwt_secret.as_ref()),
+		&EncodingKey::from_secret(JWT_SECRET.as_ref()),
 	);
 	return token.unwrap();
 }
@@ -25,7 +25,7 @@ pub fn jwt_from_id(user_id: String, timestamp: usize) -> String {
 pub fn claim_form_jwt(jwt: String) -> Option<Claims> {
 	let token = decode::<Claims>(
 		&jwt,
-		&DecodingKey::from_secret(jwt_secret.as_ref()),
+		&DecodingKey::from_secret(JWT_SECRET.as_ref()),
 		&Validation::default(),
 	);
 	if token.is_err() {

@@ -15,28 +15,22 @@ extern crate serde_derive;
 extern crate serde_json;
 
 use dotenv::dotenv;
+use oath_routes::{
+	static_rocket_route_info_for_authorize, static_rocket_route_info_for_authorize_consent,
+	static_rocket_route_info_for_protected_resource, static_rocket_route_info_for_refresh,
+	static_rocket_route_info_for_token, MyState,
+};
 use routes::*;
 use std::env;
-use std::process::Command;
 
 mod db;
 mod models;
+#[path = "routes/oauth.rs"]
+mod oath_routes;
 mod routes;
 mod schema;
 
-use std::sync::Mutex;
-
-use oxide_auth::endpoint::{OwnerConsent, Solicitation};
-use oxide_auth::frontends::simple::endpoint::{FnSolicitor, Generic, Vacant};
-use oxide_auth::primitives::prelude::*;
-use oxide_auth::primitives::registrar::RegisteredUrl;
-use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
-
-use rocket::http::ContentType;
-use rocket::response::Responder;
-use rocket::{http, Data, Response, State};
-
-pub const jwt_secret: &str = "hewwo-uwu";
+pub const JWT_SECRET: &str = "hewwo-uwu";
 
 fn rocket() -> rocket::Rocket {
 	dotenv().ok();

@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::jwt_secret;
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
-use oxide_auth::primitives::generator;
+
 use oxide_auth::primitives::grant::Grant;
 use oxide_auth::primitives::issuer::{IssuedToken, Issuer};
 use oxide_auth::primitives::issuer::{RefreshedToken, TokenType};
-use oxide_auth::primitives::prelude::{RandomGenerator, TagGrant, TokenMap};
+use oxide_auth::primitives::prelude::{RandomGenerator, TagGrant};
 
 mod utils;
 
@@ -24,6 +22,7 @@ struct Token {
 }
 
 impl Token {
+	#[allow(dead_code)]
 	fn from_access(access: Arc<str>, grant: Grant) -> Self {
 		Token {
 			access,
