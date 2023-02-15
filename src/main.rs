@@ -15,6 +15,7 @@ extern crate serde_derive;
 extern crate serde_json;
 
 use dotenv::dotenv;
+use google_routes::static_rocket_route_info_for_fullfilment;
 use oath_routes::{
 	static_rocket_route_info_for_authorize, static_rocket_route_info_for_authorize_consent,
 	static_rocket_route_info_for_protected_resource, static_rocket_route_info_for_refresh,
@@ -27,6 +28,9 @@ mod db;
 mod models;
 #[path = "routes/oauth.rs"]
 mod oath_routes;
+
+#[path = "routes/google.rs"]
+mod google_routes;
 mod routes;
 mod schema;
 
@@ -47,10 +51,14 @@ fn rocket() -> rocket::Rocket {
 				get_all,
 				register,
 				get_me,
+				get_devices,
+				register_device,
 				login,
+				fullfilment,
 				find_user,
 				authorize,
 				authorize_consent,
+				logout,
 				token,
 				protected_resource,
 				refresh

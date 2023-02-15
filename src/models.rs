@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use super::schema::devices::dsl::devices as all_devices;
+use super::schema::lights::dsl::lights as all_lights;
+use super::schema::traits::dsl::traits as all_traits;
 use super::schema::users::dsl::users as all_users;
-use super::schema::{devices, users};
+use super::schema::{devices, lights, traits, users};
 use diesel;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -15,13 +19,18 @@ pub struct User {
 	pub last_name: String,
 }
 
-#[derive(Serialize, Deserialize, Queryable)]
+
+
+#[derive(Serialize, Deserialize, Queryable, Insertable, Clone)]
 #[diesel(belongs_to(User))]
 pub struct Device {
 	pub id: Uuid,
 	pub type_: String,
 	pub user_id: i32,
-	pub secret: String,
+	pub internal_name: String,
+	pub name: String,
+	pub nicknames: Vec<Option<String>>,
+	pub traits: Vec<Option<String>>,
 }
 
 // decode request data
@@ -44,15 +53,74 @@ pub struct NewUser {
 	pub first_name: String,
 	pub last_name: String,
 }
+#[derive(Serialize, Deserialize, Queryable, Insertable, Clone)]
+#[diesel(belongs_to(User))]
+#[table_name = "lights"]
+pub struct Light {
+	pub light_id: Uuid,
+	pub red: i32,
+	pub green: i32,
+	pub blue: i32,
+	pub brightness: i32,
+	pub is_on: bool,
+	pub user_id: i32,
+	pub secret: String,
+}
 
+#[derive(Serialize, Deserialize, Queryable, Insertable, Clone)]
+#[table_name = "traits"]
+pub struct Trait {
+	pub device_type: String,
+	pub trait_: String,
+}
+
+impl Trait {
+	pub fn get_traits_for_device_type(device_type: String, conn: &PgConnection) -> Vec<Trait> {
+		all_traits
+			.filter(traits::device_type.eq(device_type))
+			.load::<Trait>(conn)
+			.expect("error!")
+	}
+}
+
+impl Light {
+	fn new(_light_id: Uuid, secret: String, user_id: i32) -> Self {
+		return Self {
+			light_id: _light_id,
+			red: 255,
+			green: 255,
+			blue: 255,
+			brightness: 255,
+			is_on: true,
+			secret: secret,
+			user_id,
+		};
+	}
+	pub fn insert_device(
+		_light_id: Uuid,
+		conn: &PgConnection,
+		secret: String,
+		user_id: i32,
+	) -> bool {
+		diesel::insert_into(lights::table)
+			.values(&Light::new(_light_id, secret, user_id))
+			.execute(conn)
+			.is_ok()
+	}
+	pub fn get_devices_by_user(user_id: i32, conn: &PgConnection) -> Vec<Light> {
+		all_lights
+			.filter(lights::user_id.eq(user_id))
+			.load::<Light>(conn)
+			.expect("error!")
+	}
+}
 // this is to insert users to database
-#[derive(Serialize, Deserialize, Insertable)]
-#[table_name = "devices"]
+#[derive(Serialize, Deserialize)]
 pub struct NewDevice {
 	pub id: Uuid,
 	pub type_: String,
-	pub user_id: i32,
 	pub secret: String,
+	pub name: String,
 }
 
 impl User {
@@ -92,7 +160,7 @@ impl Device {
 			.expect("error!")
 	}
 
-	pub fn insert_device(device: NewDevice, conn: &PgConnection) -> bool {
+	pub fn insert_device(device: Device, conn: &PgConnection) -> bool {
 		diesel::insert_into(devices::table)
 			.values(&device)
 			.execute(conn)

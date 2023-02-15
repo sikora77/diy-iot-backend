@@ -12,7 +12,7 @@ diesel = { version = "1.0.0", features = ["postgres","uuid"] }
 dotenv = "0.15.0"
 r2d2-diesel = "1.0.0"
 r2d2 = "0.8"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
 custom_derive ="0.1.7"
@@ -21,6 +21,8 @@ oxide-auth="0.5.3"
 jsonwebtoken = "8.2.0"
 serde_urlencoded = "0.7.1"
 chrono="0.4.23"
+argon2 = "0.4"
+rand_core = { version = "0.6", features = ["std"] }
 uuid={version="0.6.5",features=["v4","serde"]}
 [dependencies.rocket_contrib]
 version = "*"

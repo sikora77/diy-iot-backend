@@ -4,7 +4,7 @@ use oxide_auth::{
 	endpoint::{Authorizer, Issuer, OwnerConsent, Registrar, Solicitation},
 	frontends::simple::endpoint::{FnSolicitor, Vacant},
 	primitives::{
-		prelude::{AuthMap, RandomGenerator},
+		prelude::{AuthMap, RandomGenerator, TokenMap},
 		registrar::{Client, ClientMap, RegisteredUrl},
 	},
 };
@@ -23,7 +23,7 @@ use crate::SESSION_STRING;
 pub struct MyState {
 	registrar: Mutex<ClientMap>,
 	authorizer: Mutex<AuthMap<RandomGenerator>>,
-	issuer: Mutex<jwt_issuer::JwtIssuer>,
+	issuer: Mutex<TokenMap<RandomGenerator>>,
 }
 
 #[get("/authorize")]
@@ -162,7 +162,7 @@ impl MyState {
 			// We could also use a `TokenSigner::ephemeral` here to create signed tokens which can
 			// be read and parsed by anyone, but not maliciously created. However, they can not be
 			// revoked and thus don't offer even longer lived refresh tokens.
-			issuer: Mutex::new(jwt_issuer::JwtIssuer::new(RandomGenerator::new(16))),
+			issuer: Mutex::new(TokenMap::new(RandomGenerator::new(16))),
 		}
 	}
 

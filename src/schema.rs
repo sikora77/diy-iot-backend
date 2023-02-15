@@ -6,7 +6,31 @@ diesel::table! {
         #[sql_name = "type"]
         type_ -> Varchar,
         user_id -> Int4,
+        internal_name -> Text,
+        name -> Text,
+        nicknames -> Array<Nullable<Text>>,
+        traits -> Array<Nullable<Text>>,
+    }
+}
+
+diesel::table! {
+    lights (light_id) {
+        light_id -> Uuid,
+        red -> Int4,
+        green -> Int4,
+        blue -> Int4,
+        brightness -> Int4,
+        is_on -> Bool,
+        user_id -> Int4,
         secret -> Varchar,
+    }
+}
+
+diesel::table! {
+    traits (device_type) {
+        device_type -> Text,
+        #[sql_name = "trait"]
+        trait_ -> Text,
     }
 }
 
@@ -22,5 +46,7 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     devices,
+    lights,
+    traits,
     users,
 );
