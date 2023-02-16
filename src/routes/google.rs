@@ -1,16 +1,15 @@
 use crate::db::Conn as DbConn;
 use crate::google_routes::google_structs::{
-	DeviceAttributes, GoogleDevice, GoogleResponse, NameStruct, Payload,
+	DeviceAttributes, GoogleDevice, GoogleResponse, NameStruct, SyncPayload,
 };
 use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
 use rocket::http::Status;
-use rocket::{http, response::Responder};
-use rocket::{
-	http::{ContentType, Cookies},
-	Data, Response, State,
-};
+use rocket::response::Responder;
+use rocket::{http::ContentType, Response, State};
+
 use std::collections::HashMap;
-use std::{io, sync::Mutex};
+use std::hash::Hash;
+use std::io;
 
 #[path = "../constants.rs"]
 mod constants;
@@ -20,14 +19,13 @@ mod google_structs;
 mod jwt_issuer;
 #[path = "../utils.rs"]
 mod utils;
-use crate::models::Device;
+use crate::models::{Device, Light};
 use crate::oath_routes::MyState;
-use crate::SESSION_STRING;
+
 use rocket_contrib::json::Json;
-use serde_json::Value;
 
 use self::constants::{NON_RGB_LIGHT, RGB_LIGHT};
-use self::google_structs::GoogleRequest;
+use self::google_structs::{Color, GoogleRequest, HeaterState, LightState, QueryPayload, States};
 
 #[post("/fullfilment", format = "application/json", data = "<request>")]
 pub fn fullfilment<'r>(
@@ -49,15 +47,19 @@ pub fn fullfilment<'r>(
 
 			let input = request.inputs.first().unwrap();
 			if input.intent == "action.devices.SYNC" {
-				let response = handleSync(request_id, user_id, conn);
-				// response.payload.devices = devices;
+				let response = handle_sync(request_id, user_id, conn);
+				Ok(Json(
+					json! ({"requestId":response.requestId,"payload":response.payload}),
+				))
+			} else if input.intent == "action.devices.QUERY" {
+				let response = handle_query(request_id, user_id, conn);
 				Ok(Json(
 					json! ({"requestId":response.requestId,"payload":response.payload}),
 				))
 			} else {
 				let response = GoogleResponse {
 					requestId: request_id.clone(),
-					payload: Payload {
+					payload: SyncPayload {
 						agentUserId: None,
 						devices: None,
 						errorCode: Some("notSupported".to_string()),
@@ -82,8 +84,8 @@ pub fn fullfilment<'r>(
 	}
 }
 
-fn handleSync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse {
-	let mut devices: Vec<GoogleDevice> = Device::get_devices_by_user(user_id, &conn)
+fn handle_sync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse<SyncPayload> {
+	let devices: Vec<GoogleDevice> = Device::get_devices_by_user(user_id, &conn)
 		.iter()
 		.filter_map(|device| {
 			let traits: Vec<String> = device
@@ -135,11 +137,38 @@ fn handleSync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse 
 		.collect();
 	GoogleResponse {
 		requestId: request_id.clone(),
-		payload: Payload {
+		payload: SyncPayload {
 			agentUserId: Some(user_id.to_string()),
 			devices: Some(devices),
 			errorCode: None,
 			status: None,
 		},
+	}
+}
+
+fn handle_query(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse<QueryPayload> {
+	let mut devices = HashMap::new();
+	for device in Light::get_devices_by_user(user_id, &conn).iter() {
+		let state = LightState {
+			status: Some("SUCCESS".to_string()),
+			online: true,
+			on: device.is_on,
+			brightness: Some(device.brightness),
+			color: Some(Color {
+				spectrumRGB: device.rgb,
+			}),
+		};
+		devices.insert(device.light_id.to_string(), States::Light(state));
+	}
+	let test = HeaterState {
+		status: Some("SUCCESS".to_string()),
+		online: true,
+		on: true,
+		temp: Some(100),
+	};
+	devices.insert("2".to_string(), States::Heater(test));
+	GoogleResponse {
+		requestId: request_id.clone(),
+		payload: QueryPayload { devices: devices },
 	}
 }

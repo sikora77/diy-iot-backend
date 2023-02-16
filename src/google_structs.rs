@@ -1,22 +1,53 @@
+#![allow(non_snake_case)]
+
 use std::collections::HashMap;
 
-use serde_json::Value;
+use serde::{Serialize, Serializer};
+use serde_repr::*;
 use uuid::Uuid;
-
+//Google request structs
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GoogleRequest {
 	pub requestId: String,
 	pub inputs: Vec<Input>,
 }
-
 #[derive(Clone, Serialize, Deserialize)]
-pub struct GoogleResponse {
+pub struct Input {
+	pub intent: String,
+	pub payload: Option<Payload>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Payload {
+	pub devices: Option<Vec<DeviceData>>,
+	pub commands: Option<Vec<Command>>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DeviceData {
+	pub id: String,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Command {
+	pub devices: Vec<String>,
+	pub execution: Vec<Execution>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Execution {
+	pub command: String,
+	pub params: Params,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Params {
+	pub on: Option<String>,
+}
+//Structs used to respond to SYNC requests
+#[derive(Clone, Serialize, Deserialize)]
+pub struct GoogleResponse<T> {
 	pub requestId: String,
-	pub payload: Payload,
+	pub payload: T,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Payload {
+pub struct SyncPayload {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub agentUserId: Option<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -50,16 +81,40 @@ pub struct DeviceAttributes {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub colorTemperatureRange: Option<HashMap<String, i32>>,
 }
+// Structs used to respond to QUERY requests
+
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Input {
-	pub intent: String,
-	pub payload: QueryRequestPayload,
+pub struct LightState {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub status: Option<String>,
+	pub online: bool,
+	pub on: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub brightness: Option<i32>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub color: Option<Color>,
 }
 #[derive(Clone, Serialize, Deserialize)]
-pub struct DeviceData {
-	pub id: String,
+pub struct HeaterState {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub status: Option<String>,
+	pub online: bool,
+	pub on: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub temp: Option<i32>,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum States {
+	Light(LightState),
+	Heater(HeaterState),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Color {
+	pub spectrumRGB: i32,
 }
 #[derive(Clone, Serialize, Deserialize)]
-pub struct QueryRequestPayload {
-	pub devices: Vec<DeviceData>,
+pub struct QueryPayload {
+	pub devices: HashMap<String, States>,
 }

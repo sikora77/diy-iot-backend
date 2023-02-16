@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::schema::devices::dsl::devices as all_devices;
 use super::schema::lights::dsl::lights as all_lights;
 use super::schema::traits::dsl::traits as all_traits;
@@ -18,8 +16,6 @@ pub struct User {
 	pub first_name: String,
 	pub last_name: String,
 }
-
-
 
 #[derive(Serialize, Deserialize, Queryable, Insertable, Clone)]
 #[diesel(belongs_to(User))]
@@ -58,9 +54,7 @@ pub struct NewUser {
 #[table_name = "lights"]
 pub struct Light {
 	pub light_id: Uuid,
-	pub red: i32,
-	pub green: i32,
-	pub blue: i32,
+	pub rgb: i32,
 	pub brightness: i32,
 	pub is_on: bool,
 	pub user_id: i32,
@@ -70,6 +64,7 @@ pub struct Light {
 #[derive(Serialize, Deserialize, Queryable, Insertable, Clone)]
 #[table_name = "traits"]
 pub struct Trait {
+	pub id: i32,
 	pub device_type: String,
 	pub trait_: String,
 }
@@ -87,9 +82,7 @@ impl Light {
 	fn new(_light_id: Uuid, secret: String, user_id: i32) -> Self {
 		return Self {
 			light_id: _light_id,
-			red: 255,
-			green: 255,
-			blue: 255,
+			rgb: 255 * 255 * 255,
 			brightness: 255,
 			is_on: true,
 			secret: secret,

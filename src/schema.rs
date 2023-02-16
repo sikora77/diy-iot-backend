@@ -16,9 +16,7 @@ diesel::table! {
 diesel::table! {
     lights (light_id) {
         light_id -> Uuid,
-        red -> Int4,
-        green -> Int4,
-        blue -> Int4,
+        rgb -> Int4,
         brightness -> Int4,
         is_on -> Bool,
         user_id -> Int4,
@@ -27,7 +25,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    traits (device_type) {
+    traits (id) {
+        id -> Int4,
         device_type -> Text,
         #[sql_name = "trait"]
         trait_ -> Text,

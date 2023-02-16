@@ -15,6 +15,7 @@ r2d2 = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
+serde_repr = "0.1"
 custom_derive ="0.1.7"
 oxide-auth-rocket="0.1.0"
 oxide-auth="0.5.3"

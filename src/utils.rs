@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use rocket::http::Cookie;
 

@@ -10,16 +10,16 @@ use argon2::{
 	password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
 	Argon2,
 };
-use oxide_auth::endpoint::{OwnerConsent, Solicitation};
-use oxide_auth::frontends::simple::endpoint::{FnSolicitor, Generic, Vacant};
-use oxide_auth::primitives::prelude::*;
-use oxide_auth::primitives::registrar::RegisteredUrl;
-use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
-use rocket::http::{ContentType, Cookie, Cookies, SameSite};
-use rocket::response::Responder;
-use rocket::{http, Data, Response, State};
-use std::io;
-use std::sync::Mutex;
+
+
+
+
+
+use rocket::http::{Cookie, Cookies, SameSite};
+
+
+
+
 
 use self::constants::{NON_RGB_LIGHT, RGB_LIGHT};
 
