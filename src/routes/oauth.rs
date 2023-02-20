@@ -147,7 +147,7 @@ impl MyState {
 				vec![Client::public(
 					"LocalClient",
 					RegisteredUrl::Semantic(
-						"http://localhost:8000/clientside/endpoint".parse().unwrap(),
+						"http://localhost:8000/api/v1/getToken".parse().unwrap(),
 					),
 					"default-scope".parse().unwrap(),
 				)]

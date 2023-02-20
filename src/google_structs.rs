@@ -21,13 +21,13 @@ pub struct Payload {
 	pub devices: Option<Vec<DeviceData>>,
 	pub commands: Option<Vec<Command>>,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DeviceData {
 	pub id: String,
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Command {
-	pub devices: Vec<String>,
+	pub devices: Vec<DeviceData>,
 	pub execution: Vec<Execution>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -37,7 +37,9 @@ pub struct Execution {
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Params {
-	pub on: Option<String>,
+	pub on: Option<bool>,
+	pub color: Option<Color>,
+	pub brightness: Option<i32>,
 }
 //Structs used to respond to SYNC requests
 #[derive(Clone, Serialize, Deserialize)]
@@ -58,7 +60,6 @@ pub struct SyncPayload {
 	pub status: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
-
 pub struct GoogleDevice {
 	pub id: Uuid,
 	#[serde(rename(serialize = "type"))]
@@ -85,10 +86,9 @@ pub struct DeviceAttributes {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LightState {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub status: Option<String>,
 	pub online: bool,
-	pub on: bool,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub on: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub brightness: Option<i32>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -96,8 +96,6 @@ pub struct LightState {
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct HeaterState {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub status: Option<String>,
 	pub online: bool,
 	pub on: bool,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -117,4 +115,18 @@ pub struct Color {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct QueryPayload {
 	pub devices: HashMap<String, States>,
+}
+// Structs used to respond to EXECUTE REQUESTS
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ExecutePayload {
+	pub commands: Vec<CommandsResponse>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CommandsResponse {
+	pub ids: Vec<String>,
+	pub status: String,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub states: Option<States>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub errorCode: Option<String>,
 }

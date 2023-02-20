@@ -2,10 +2,13 @@ use crate::db::Conn as DbConn;
 use crate::google_routes::google_structs::{
 	DeviceAttributes, GoogleDevice, GoogleResponse, NameStruct, SyncPayload,
 };
+use coap_client::{ClientOptions, HostOptions, RequestOptions, TokioClient};
 use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
 use rocket::http::Status;
 use rocket::response::Responder;
 use rocket::{http::ContentType, Response, State};
+use tokio::runtime::Runtime;
+use tokio::task;
 
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -25,7 +28,11 @@ use crate::oath_routes::MyState;
 use rocket_contrib::json::Json;
 
 use self::constants::{NON_RGB_LIGHT, RGB_LIGHT};
-use self::google_structs::{Color, GoogleRequest, HeaterState, LightState, QueryPayload, States};
+use self::google_structs::{
+	Color, CommandsResponse, DeviceData, ExecutePayload, GoogleRequest, HeaterState, LightState,
+	QueryPayload, States,
+};
+use futures::executor::block_on;
 
 #[post("/fullfilment", format = "application/json", data = "<request>")]
 pub fn fullfilment<'r>(
@@ -46,29 +53,39 @@ pub fn fullfilment<'r>(
 			let request_id = request.requestId.clone();
 
 			let input = request.inputs.first().unwrap();
-			if input.intent == "action.devices.SYNC" {
-				let response = handle_sync(request_id, user_id, conn);
-				Ok(Json(
-					json! ({"requestId":response.requestId,"payload":response.payload}),
-				))
-			} else if input.intent == "action.devices.QUERY" {
-				let response = handle_query(request_id, user_id, conn);
-				Ok(Json(
-					json! ({"requestId":response.requestId,"payload":response.payload}),
-				))
-			} else {
-				let response = GoogleResponse {
-					requestId: request_id.clone(),
-					payload: SyncPayload {
-						agentUserId: None,
-						devices: None,
-						errorCode: Some("notSupported".to_string()),
-						status: Some("ERROR".to_string()),
-					},
-				};
-				Ok(Json(
-					json! ({"requestId":response.requestId,"payload":response.payload}),
-				))
+			match input.intent.as_str() {
+				"action.devices.SYNC" => {
+					let response = handle_sync(request_id, user_id, conn);
+					Ok(Json(
+						json! ({"requestId":response.requestId,"payload":response.payload}),
+					))
+				}
+				"action.devices.QUERY" => {
+					let response = handle_query(request_id, user_id, conn);
+					Ok(Json(
+						json! ({"requestId":response.requestId,"payload":response.payload}),
+					))
+				}
+				"action.devices.EXECUTE" => {
+					let response = handle_execute(request.into_inner(), user_id, conn);
+					Ok(Json(
+						json! ({"requestId":response.requestId,"payload":response.payload}),
+					))
+				}
+				_ => {
+					let response = GoogleResponse {
+						requestId: request_id.clone(),
+						payload: SyncPayload {
+							agentUserId: None,
+							devices: None,
+							errorCode: Some("notSupported".to_string()),
+							status: Some("ERROR".to_string()),
+						},
+					};
+					Ok(Json(
+						json! ({"requestId":response.requestId,"payload":response.payload}),
+					))
+				}
 			}
 		}
 		Err(Ok(response)) => {
@@ -147,12 +164,12 @@ fn handle_sync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse
 }
 
 fn handle_query(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse<QueryPayload> {
+	println!("{}", user_id);
 	let mut devices = HashMap::new();
 	for device in Light::get_devices_by_user(user_id, &conn).iter() {
 		let state = LightState {
-			status: Some("SUCCESS".to_string()),
 			online: true,
-			on: device.is_on,
+			on: Some(device.is_on),
 			brightness: Some(device.brightness),
 			color: Some(Color {
 				spectrumRGB: device.rgb,
@@ -160,15 +177,109 @@ fn handle_query(request_id: String, user_id: i32, conn: DbConn) -> GoogleRespons
 		};
 		devices.insert(device.light_id.to_string(), States::Light(state));
 	}
-	let test = HeaterState {
-		status: Some("SUCCESS".to_string()),
-		online: true,
-		on: true,
-		temp: Some(100),
-	};
-	devices.insert("2".to_string(), States::Heater(test));
 	GoogleResponse {
 		requestId: request_id.clone(),
 		payload: QueryPayload { devices: devices },
 	}
+}
+fn handle_execute(
+	request: GoogleRequest,
+	user_id: i32,
+	conn: DbConn,
+) -> GoogleResponse<ExecutePayload> {
+	let mut command_outputs: Vec<CommandsResponse> = vec![];
+	let commands = request
+		.inputs
+		.first()
+		.unwrap()
+		.payload
+		.as_ref()
+		.unwrap()
+		.commands
+		.as_ref()
+		.unwrap()
+		.iter();
+	let user_devices = Device::get_devices_by_user(user_id, &conn);
+	for command in commands {
+		for execution in command.execution.iter() {
+			match execution.command.as_str() {
+				"action.devices.commands.OnOff" => {
+					// let output = task::block_in_place(|| handle_on_off(command.devices.as_ref()));
+					let rt = Runtime::new().unwrap();
+					let mut devices = rt.block_on(handle_on_off(
+						command.devices.as_ref(),
+						user_devices.as_ref(),
+					));
+					command_outputs.append(&mut devices);
+				}
+				_ => {}
+			}
+		}
+	}
+	GoogleResponse {
+		requestId: request.requestId,
+		payload: ExecutePayload {
+			commands: command_outputs,
+		},
+	}
+}
+
+async fn handle_on_off(
+	devices: &Vec<DeviceData>,
+	user_devices: &Vec<Device>,
+) -> Vec<CommandsResponse> {
+	let mut success = CommandsResponse {
+		ids: vec![],
+		status: "SUCCESS".to_string(),
+		states: Some(States::Light(LightState {
+			online: true,
+			on: Some(true),
+			brightness: None,
+			color: None,
+		})),
+		errorCode: None,
+	};
+	let mut failure = CommandsResponse {
+		ids: vec![],
+		status: "ERROR".to_string(),
+		states: None,
+		errorCode: Some("deviceOffline".to_string()),
+	};
+	let mut host_opts = HostOptions::default();
+	host_opts.host = "192.168.33.108".to_string();
+	host_opts.port = 5683;
+	let mut req_opts = RequestOptions::default();
+	req_opts.non_confirmable = false;
+	let mut client = TokioClient::connect(host_opts, &ClientOptions::default()).await;
+	let device_map: Vec<String> = user_devices
+		.iter()
+		.map(|device| device.id.to_string())
+		.collect();
+	if client.is_err() {
+	} else {
+		for device in devices.iter() {
+			println!("{:?}", device);
+			if !device_map.contains(&device.id) {
+			} else {
+				let resp = client
+					.as_mut()
+					.unwrap()
+					.put(format!("/devices/{}", device.id).as_str(), None, &req_opts)
+					.await;
+				//TODO handle errors
+				if resp.is_err() {
+					//something went wrong when sending the request
+				} else {
+					// Check the response
+					if resp.unwrap_or_default().len() != 0 {
+						failure.ids.push(device.id.clone());
+					} else {
+						// println!("{}", resp_payload.unwrap());
+						success.ids.push(device.id.clone());
+					}
+				}
+			}
+		}
+	}
+	return vec![success, failure];
 }

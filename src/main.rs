@@ -14,13 +14,17 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+use db::Pool;
+use diesel::{Connection, PgConnection};
 use dotenv::dotenv;
 use google_routes::static_rocket_route_info_for_fullfilment;
+use models::Device;
 use oath_routes::{
 	static_rocket_route_info_for_authorize, static_rocket_route_info_for_authorize_consent,
 	static_rocket_route_info_for_protected_resource, static_rocket_route_info_for_refresh,
 	static_rocket_route_info_for_token, MyState,
 };
+use r2d2_diesel::ConnectionManager;
 use routes::*;
 use std::env;
 
@@ -33,6 +37,8 @@ mod oath_routes;
 mod google_routes;
 mod routes;
 mod schema;
+#[path = "utils.rs"]
+mod utils;
 
 pub const JWT_SECRET: &str = "hewwo-uwu";
 
@@ -61,23 +67,13 @@ fn rocket() -> rocket::Rocket {
 				logout,
 				token,
 				protected_resource,
-				refresh
+				refresh,
+				get_token,
 			],
 		)
 }
 
 fn main() {
-	// let _output = if cfg!(target_os = "windows") {
-	//     Command::new("cmd")
-	//         .args(&["/C", "cd ui && npm start"])
-	//         .spawn()
-	//         .expect("Failed to start UI Application")
-	// } else {
-	//     Command::new("sh")
-	//         .arg("-c")
-	//         .arg("cd ui && npm start")
-	//         .spawn()
-	//         .expect("Failed to start UI Application")
-	// };
+	utils::handle_startup();
 	rocket().launch();
 }

@@ -115,6 +115,11 @@ pub struct NewDevice {
 	pub secret: String,
 	pub name: String,
 }
+#[derive(Serialize, Deserialize)]
+pub struct DeviceSignature {
+	pub id: Uuid,
+	pub type_: String,
+}
 
 impl User {
 	pub fn get_all_users(conn: &PgConnection) -> Vec<User> {
