@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script>
+			// console.log(document.location.href);
+			const url = new URL(window.location.href);
+			console.log(url.host);
+			const code = url.searchParams.get('code');
+			console.log(code);
+			var details = {
+				redirect_uri: `http://${url.host}/oauth/getToken`,
+				code: code,
+				client_id: 'LocalClient',
+				grant_type: 'authorization_code',
+			};
+
+			var formBody = [];
+			for (var property in details) {
+				var encodedKey = encodeURIComponent(property);
+				var encodedValue = encodeURIComponent(details[property]);
+				formBody.push(encodedKey + '=' + encodedValue);
+			}
+			formBody = formBody.join('&');
+
+			fetch(`http://${url.host}/oauth/token`, {
+				method: 'POST',
+				headers: {
+					'Content-Type':
+						'application/x-www-form-urlencoded;charset=UTF-8',
+				},
+				body: formBody,
+			})
+				.then((value) => value.json())
+				.then((value) => {
+					document.getElementById('token').innerHTML =
+						value.access_token;
+					document.getElementById(
+						('refresh'.innerHTML = value.refresh_token)
+					);
+				});
+		</script>
+	</head>
+	<body>
+		<div id="token"></div>
+		<div id="refresh"></div>
+	</body>
+</html>

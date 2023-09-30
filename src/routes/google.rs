@@ -7,12 +7,9 @@ use oxide_auth_rocket::{OAuthFailure, OAuthRequest, OAuthResponse};
 use rocket::http::Status;
 use rocket::response::Responder;
 use rocket::{http::ContentType, Response, State};
-use tokio::runtime::Runtime;
-use tokio::task;
-
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::io;
+use tokio::runtime::Runtime;
 
 #[path = "../constants.rs"]
 mod constants;
@@ -29,10 +26,9 @@ use rocket_contrib::json::Json;
 
 use self::constants::{NON_RGB_LIGHT, RGB_LIGHT};
 use self::google_structs::{
-	Color, CommandsResponse, DeviceData, ExecutePayload, GoogleRequest, HeaterState, LightState,
-	QueryPayload, States,
+	Color, CommandsResponse, DeviceData, ExecutePayload, GoogleRequest, LightState, QueryPayload,
+	States,
 };
-use futures::executor::block_on;
 
 #[post("/fullfilment", format = "application/json", data = "<request>")]
 pub fn fullfilment<'r>(
@@ -101,8 +97,8 @@ pub fn fullfilment<'r>(
 	}
 }
 
-fn handle_sync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse<SyncPayload> {
-	let devices: Vec<GoogleDevice> = Device::get_devices_by_user(user_id, &conn)
+fn handle_sync(request_id: String, user_id: i32, mut conn: DbConn) -> GoogleResponse<SyncPayload> {
+	let devices: Vec<GoogleDevice> = Device::get_devices_by_user(user_id, &mut conn)
 		.iter()
 		.filter_map(|device| {
 			let traits: Vec<String> = device
@@ -163,10 +159,14 @@ fn handle_sync(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse
 	}
 }
 
-fn handle_query(request_id: String, user_id: i32, conn: DbConn) -> GoogleResponse<QueryPayload> {
+fn handle_query(
+	request_id: String,
+	user_id: i32,
+	mut conn: DbConn,
+) -> GoogleResponse<QueryPayload> {
 	println!("{}", user_id);
 	let mut devices = HashMap::new();
-	for device in Light::get_devices_by_user(user_id, &conn).iter() {
+	for device in Light::get_devices_by_user(user_id, &mut conn).iter() {
 		let state = LightState {
 			online: true,
 			on: Some(device.is_on),
@@ -185,7 +185,7 @@ fn handle_query(request_id: String, user_id: i32, conn: DbConn) -> GoogleRespons
 fn handle_execute(
 	request: GoogleRequest,
 	user_id: i32,
-	conn: DbConn,
+	mut conn: DbConn,
 ) -> GoogleResponse<ExecutePayload> {
 	let mut command_outputs: Vec<CommandsResponse> = vec![];
 	let commands = request
@@ -199,7 +199,7 @@ fn handle_execute(
 		.as_ref()
 		.unwrap()
 		.iter();
-	let user_devices = Device::get_devices_by_user(user_id, &conn);
+	let user_devices = Device::get_devices_by_user(user_id, &mut conn);
 	for command in commands {
 		for execution in command.execution.iter() {
 			match execution.command.as_str() {

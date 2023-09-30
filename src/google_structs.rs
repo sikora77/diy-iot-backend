@@ -2,8 +2,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Serialize, Serializer};
-use serde_repr::*;
+use serde::Serialize;
 use uuid::Uuid;
 //Google request structs
 #[derive(Clone, Serialize, Deserialize)]

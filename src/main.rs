@@ -1,31 +1,42 @@
 #![feature(plugin, decl_macro, proc_macro_hygiene)]
 #![allow(proc_macro_derive_resolution_fallback, unused_attributes)]
+#![feature(mutex_unpoison)]
 
-#[macro_use]
 extern crate diesel;
 extern crate dotenv;
 extern crate r2d2;
-extern crate r2d2_diesel;
 #[macro_use]
 extern crate rocket;
 extern crate rocket_contrib;
+extern crate rocket_cors;
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use db::Pool;
-use diesel::{Connection, PgConnection};
 use dotenv::dotenv;
 use google_routes::static_rocket_route_info_for_fullfilment;
-use models::Device;
 use oath_routes::{
 	static_rocket_route_info_for_authorize, static_rocket_route_info_for_authorize_consent,
-	static_rocket_route_info_for_protected_resource, static_rocket_route_info_for_refresh,
-	static_rocket_route_info_for_token, MyState,
+	static_rocket_route_info_for_get_token, static_rocket_route_info_for_protected_resource,
+	static_rocket_route_info_for_refresh, static_rocket_route_info_for_token, MyState,
 };
-use r2d2_diesel::ConnectionManager;
-use routes::*;
+use rocket::http::Method;
+use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
+use routes::{
+	device::{
+		static_rocket_route_info_for_get_devices, static_rocket_route_info_for_get_full_devices,
+		static_rocket_route_info_for_register_device, static_rocket_route_info_for_set_brightness,
+		static_rocket_route_info_for_set_color, static_rocket_route_info_for_set_on,
+	},
+	user::{
+		static_rocket_route_info_for_get_me, static_rocket_route_info_for_login,
+		static_rocket_route_info_for_logout, static_rocket_route_info_for_register,
+	},
+};
+
+//use routes::*;
 use std::env;
 
 mod db;
@@ -35,16 +46,17 @@ mod oath_routes;
 
 #[path = "routes/google.rs"]
 mod google_routes;
-mod routes;
 mod schema;
-#[path = "utils.rs"]
-mod utils;
+
+pub mod constants;
+pub mod routes;
+
+pub mod utils;
 
 pub const JWT_SECRET: &str = "hewwo-uwu";
 
 fn rocket() -> rocket::Rocket {
 	dotenv().ok();
-
 	let database_url = env::var("DATABASE_URL").expect("set DATABASE_URL");
 
 	let pool = db::init_pool(database_url);
@@ -54,23 +66,58 @@ fn rocket() -> rocket::Rocket {
 		.mount(
 			"/api/v1/",
 			routes![
-				get_all,
 				register,
 				get_me,
 				get_devices,
 				register_device,
 				login,
 				fullfilment,
-				find_user,
+				logout,
+				set_brightness,
+				set_color,
+				set_on,
+				get_full_devices,
+			],
+		)
+		.mount(
+			"/oauth",
+			routes![
+				token,
 				authorize,
 				authorize_consent,
-				logout,
-				token,
 				protected_resource,
 				refresh,
 				get_token,
 			],
 		)
+		.mount("/", rocket_cors::catch_all_options_routes())
+		.manage(make_cors())
+		.attach(make_cors())
+}
+fn make_cors() -> Cors {
+	let allowed_origins = AllowedOrigins::some_exact(&[
+		"http://localhost:3000",
+		"http://localhost:8000",
+		"http://sikora-laptop.local:3000",
+		"http://sikora-laptop.local:8000",
+	]);
+
+	CorsOptions {
+		allowed_origins,
+		allowed_methods: vec![Method::Get, Method::Post, Method::Options]
+			.into_iter()
+			.map(From::from)
+			.collect(), // 1.
+		// allowed_headers: AllowedHeaders::some(&[
+		// 	"Authorization",
+		// 	"Accept",
+		// 	"Access-Control-Allow-Origin",
+		// ]),
+		allow_credentials: true,
+		..Default::default()
+	}
+	.to_cors()
+	.expect("error while building CORS")
 }
 
 fn main() {

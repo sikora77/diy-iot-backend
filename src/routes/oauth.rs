@@ -9,7 +9,10 @@ use oxide_auth::{
 	},
 };
 use oxide_auth_rocket::{Generic, OAuthFailure, OAuthRequest, OAuthResponse};
-use rocket::{http, response::Responder};
+use rocket::{
+	http::{self, hyper::header::Location, Status},
+	response::{content::Html, Responder},
+};
 use rocket::{
 	http::{ContentType, Cookies},
 	Data, Response, State,
@@ -19,7 +22,7 @@ use rocket::{
 mod jwt_issuer;
 #[path = "../utils.rs"]
 mod utils;
-use crate::SESSION_STRING;
+use crate::routes::SESSION_STRING;
 pub struct MyState {
 	registrar: Mutex<ClientMap>,
 	authorizer: Mutex<AuthMap<RandomGenerator>>,
@@ -30,13 +33,27 @@ pub struct MyState {
 pub fn authorize<'r>(
 	oauth: OAuthRequest<'r>,
 	state: State<MyState>,
-) -> Result<OAuthResponse<'r>, OAuthFailure> {
-	state
+	cookies: Cookies,
+) -> impl Responder<'r> {
+	//Result<OAuthResponse<'r>, OAuthFailure> {
+	let user_id = utils::get_user_id_from_cookie(cookies.get(SESSION_STRING));
+	println!("{:?}", user_id);
+	if user_id.is_none() {
+		//TODO Redirect to frontend to login
+		let url = "https://iot-frontend/login".to_string();
+		println!("{url}");
+		return Ok(Response::build()
+			.status(Status::from_code(302).unwrap())
+			.header(Location(url))
+			.finalize()
+			.into());
+	}
+	return state
 		.endpoint()
 		.with_solicitor(FnSolicitor(consent_form))
 		.authorization_flow()
 		.execute(oauth)
-		.map_err(|err| err.pack::<OAuthFailure>())
+		.map_err(|err| err.pack::<OAuthFailure>());
 }
 
 #[post("/authorize?<allow>")]
@@ -47,34 +64,15 @@ pub fn authorize_consent<'r>(
 	cookies: Cookies,
 ) -> Result<OAuthResponse<'r>, OAuthFailure> {
 	let allowed = allow.unwrap_or(false);
-	let user_id = cookies.get(SESSION_STRING);
+	let user_id = utils::get_user_id_from_cookie(cookies.get(SESSION_STRING));
 	if user_id.is_none() {
-		return state
-			.endpoint()
-			.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
-				consent_decision(allowed, grant, "-1".to_string())
-			}))
-			.authorization_flow()
-			.execute(oauth)
-			.map_err(|err| err.pack::<OAuthFailure>());
+		//TODO Redirect to frontend to login
 	}
-	let claims = utils::claim_form_jwt(user_id.unwrap().value().to_string());
-	if claims.is_none() {
-		return state
-			.endpoint()
-			.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
-				consent_decision(allowed, grant, "-1".to_string())
-			}))
-			.authorization_flow()
-			.execute(oauth)
-			.map_err(|err| err.pack::<OAuthFailure>());
-	}
-	let user_id = claims.unwrap().sub;
-	println!("{}", user_id);
+	println!("{}", user_id.unwrap());
 	state
 		.endpoint()
 		.with_solicitor(FnSolicitor(move |_: &mut _, grant: Solicitation<'_>| {
-			consent_decision(allowed, grant, user_id.clone())
+			consent_decision(allowed, grant, user_id.unwrap().to_string().clone())
 		}))
 		.authorization_flow()
 		.execute(oauth)
@@ -116,7 +114,7 @@ pub fn protected_resource<'r>(
 ) -> impl Responder<'r> {
 	const DENY_TEXT: &str = "<html>
 This page should be accessed via an oauth token from the client in the example. Click
-<a href=\"/api/v1/authorize?response_type=code&client_id=LocalClient\">
+<a href=\"/oauth/authorize?response_type=code&client_id=LocalClient\">
 here</a> to begin the authorization process.
 </html>
 ";
@@ -140,17 +138,32 @@ here</a> to begin the authorization process.
 	}
 }
 
+#[get("/getToken")]
+pub fn get_token() -> Html<String> {
+	Html(include_str!("../get_token.html").to_string())
+}
+
 impl MyState {
 	pub fn preconfigured() -> Self {
 		MyState {
 			registrar: Mutex::new(
-				vec![Client::public(
-					"LocalClient",
-					RegisteredUrl::Semantic(
-						"http://localhost:8000/api/v1/getToken".parse().unwrap(),
+				vec![
+					Client::public(
+						"LocalClient",
+						RegisteredUrl::Semantic(
+							"http://localhost:8000/oauth/getToken".parse().unwrap(),
+						),
+						"default-scope".parse().unwrap(),
 					),
-					"default-scope".parse().unwrap(),
-				)]
+					Client::confidential(
+						"GoogleHome",
+						RegisteredUrl::Semantic(
+							"http://localhost:8000/oauth/getToken".parse().unwrap(),
+						),
+						"default-scope".parse().unwrap(),
+						"passphrase".as_bytes(),
+					),
+				]
 				.into_iter()
 				.collect(),
 			),
@@ -190,7 +203,7 @@ fn consent_form<'r>(
 			.status(http::Status::Ok)
 			.header(http::ContentType::HTML)
 			.sized_body(io::Cursor::new(consent_page_html(
-				"/api/v1/authorize",
+				"/oauth/authorize",
 				solicitation,
 			)))
 			.finalize()

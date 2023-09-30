@@ -1,10 +1,10 @@
+use diesel::r2d2::ConnectionManager;
 use diesel::PgConnection;
 use r2d2;
-use r2d2_diesel::ConnectionManager;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest};
 use rocket::{Outcome, Request, State};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -35,5 +35,11 @@ impl Deref for Conn {
 	#[inline(always)]
 	fn deref(&self) -> &Self::Target {
 		&self.0
+	}
+}
+impl DerefMut for Conn {
+	#[inline(always)]
+	fn deref_mut(self: &mut Conn) -> &mut diesel::PgConnection {
+		&mut self.0
 	}
 }
