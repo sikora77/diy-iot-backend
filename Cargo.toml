@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-coap-client = { path = "../rust-coap-client" }
+coap-client = { git = "https://github.com/sikora77/rust-coap-client.git", rev = "819af170f13063aa632f98f00e2a2029278e3d32" }
 rocket = { version = "0.4.4", features = ['private-cookies'] }
 rocket_codegen = "0.4.4"
 rocket_cors = "0.5.2"

@@ -95,11 +95,12 @@ fn rocket() -> rocket::Rocket {
 		.attach(make_cors())
 }
 fn make_cors() -> Cors {
+	let frontend_addr = env::var("FRONTEND_ADDR").expect("set FRONTEND_ADDR");
 	let allowed_origins = AllowedOrigins::some_exact(&[
-		"http://localhost:3000",
-		"http://localhost:8000",
-		"http://sikora-laptop.local:3000",
-		"http://sikora-laptop.local:8000",
+		frontend_addr, //"http://localhost:3000",
+		               //"http://localhost:8000",
+		               //"http://sikora-laptop.local:3000",
+		               //"http://sikora-laptop.local:8000",
 	]);
 
 	CorsOptions {

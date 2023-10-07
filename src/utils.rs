@@ -92,11 +92,10 @@ pub fn handle_startup() {
 
 pub fn insert_devices_into_coap_server(devices: Vec<Device>) {
 	let mut host_opts = HostOptions::default();
-	let mut host_opts = HostOptions::default();
-	let ip = env::var("IP").expect("set IP");
-	println!("{}", ip);
+	let ip = env::var("COAP_IP").expect("set COAP_IP");
+	let port = env::var("COAP_PORT").expect("set COAP_PORT");
 	host_opts.host = ip;
-	host_opts.port = 5683;
+	host_opts.port = port.parse().unwrap();
 	let mut req_opts = RequestOptions::default();
 	req_opts.non_confirmable = false;
 	let rt = Runtime::new().unwrap();
@@ -138,9 +137,10 @@ pub async fn send_device_command(
 	device_id: Uuid,
 ) -> Result<Packet, coap_client::Error<std::io::Error>> {
 	let mut host_opts = HostOptions::default();
-	let ip = env::var("IP").expect("set IP");
+	let ip = env::var("COAP_IP").expect("set COAP_IP");
+	let port = env::var("COAP_PORT").expect("set COAP_PORT");
 	host_opts.host = ip;
-	host_opts.port = 5683;
+	host_opts.port = port.parse().unwrap();
 	let mut req_opts = RequestOptions::default();
 	req_opts.non_confirmable = false;
 	let mut client = TokioClient::connect(host_opts, &ClientOptions::default())
@@ -160,9 +160,10 @@ pub async fn create_coap_device(
 	device_type: &str,
 ) -> Result<Packet, coap_client::Error<std::io::Error>> {
 	let mut host_opts = HostOptions::default();
-	let ip = env::var("IP").expect("set IP");
+	let ip = env::var("COAP_IP").expect("set COAP_IP");
+	let port = env::var("COAP_PORT").expect("set COAP_PORT");
 	host_opts.host = ip;
-	host_opts.port = 5683;
+	host_opts.port = port.parse().unwrap();
 	let mut req_opts = RequestOptions::default();
 	req_opts.non_confirmable = false;
 	let mut client = TokioClient::connect(host_opts, &ClientOptions::default())
