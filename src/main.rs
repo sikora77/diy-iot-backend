@@ -1,4 +1,4 @@
-#![feature(plugin, decl_macro, proc_macro_hygiene)]
+#![feature(decl_macro, proc_macro_hygiene)]
 #![allow(proc_macro_derive_resolution_fallback, unused_attributes)]
 #![feature(mutex_unpoison)]
 
@@ -97,10 +97,11 @@ fn rocket() -> rocket::Rocket {
 fn make_cors() -> Cors {
 	let frontend_addr = env::var("FRONTEND_ADDR").expect("set FRONTEND_ADDR");
 	let allowed_origins = AllowedOrigins::some_exact(&[
-		frontend_addr, //"http://localhost:3000",
-		               //"http://localhost:8000",
-		               //"http://sikora-laptop.local:3000",
-		               //"http://sikora-laptop.local:8000",
+		frontend_addr,
+		"http://localhost:3000".to_owned(),
+		//"http://localhost:8000",
+		"http://sikora-laptop.local:3000".to_owned(),
+		"http://sikora-laptop.local:8000".to_owned(),
 	]);
 
 	CorsOptions {

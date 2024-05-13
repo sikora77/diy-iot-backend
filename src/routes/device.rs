@@ -26,17 +26,10 @@ pub fn get_full_devices(mut conn: DbConn, user: AuthUser) -> Json<Value> {
 	return Json(json! ({"status":200,"lights":lights}));
 }
 
-#[post("/set_on", format = "application/json", data = "<device_data>")]
-pub fn set_on(mut conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -> Json<Value> {
-	let user_id = user.user_id;
-	let device = Light::get_device_by_id(device_data.device_id, &mut conn);
+fn update_device(user_id: i32, device_data: DeviceData, mut db_conn: DbConn) -> Json<Value> {
+	let device = Light::get_device_by_id(device_data.device_id, &mut db_conn);
 	if device.is_none() {
 		return Json(json!({"success":false,"error":"Device does not exist"}));
-	}
-	if device_data.is_on.is_none() {
-		return Json(json!(
-			{"success":false,"error":"Invalid device status"}
-		));
 	}
 	let device = device.unwrap();
 	if user_id != device.user_id {
@@ -44,16 +37,28 @@ pub fn set_on(mut conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -
 			{"success":false,"error":"You are not the owner of the device"}
 		));
 	}
-	let rt = Runtime::new().unwrap();
-	let light_state = LightState {
+	let mut light_state = LightState {
 		brightness: device.brightness,
 		color: device.rgb,
-		is_on: device_data.is_on.unwrap(),
+		is_on: device.is_on,
 	};
-	let update_result = Light::update_device_is_on(
+	light_state.brightness = match device_data.brightness {
+		Some(brightness) => brightness,
+		None => device.brightness,
+	};
+	light_state.is_on = match device_data.is_on {
+		Some(on) => on,
+		None => device.is_on,
+	};
+	light_state.color = match device_data.color {
+		Some(color) => color,
+		None => device.rgb,
+	};
+	let rt = Runtime::new().unwrap();
+	Light::update_device(
 		device.light_id,
-		device_data.is_on.unwrap(),
-		&mut conn,
+		&light_state,
+		&mut db_conn,
 		device.secret,
 		device.user_id,
 	);
@@ -68,100 +73,25 @@ pub fn set_on(mut conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -
 			{"success":false,"error":"device not found"}
 		));
 	}
-	//println!("{}", resp.unwrap().header.get_code());
 
 	return Json(json!({"success":true}));
+}
+#[post("/set_on", format = "application/json", data = "<device_data>")]
+pub fn set_on(conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -> Json<Value> {
+	let user_id = user.user_id;
+	return update_device(user_id, device_data.0, conn);
 }
 
 #[post("/set_color", format = "application/json", data = "<device_data>")]
-pub fn set_color(mut conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -> Json<Value> {
+pub fn set_color(conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -> Json<Value> {
 	let user_id = user.user_id;
-	let device = Light::get_device_by_id(device_data.device_id, &mut conn);
-	if device.is_none() {
-		return Json(json!({"success":false,"error":"Device does not exist"}));
-	}
-	if device_data.color.is_none() {
-		return Json(json!(
-			{"success":false,"error":"Invalid device color"}
-		));
-	}
-	let device = device.unwrap();
-	if user_id != device.user_id {
-		return Json(json!(
-			{"success":false,"error":"You are not the owner of the device"}
-		));
-	}
-	let update_result = Light::update_device_brightness(
-		device.light_id,
-		device_data.color.unwrap(),
-		&mut conn,
-		device.secret,
-		device.user_id,
-	);
-	let rt = Runtime::new().unwrap();
-	let light_state = LightState {
-		brightness: device.brightness,
-		color: device_data.color.unwrap(),
-		is_on: true,
-	};
-	let resp = rt.block_on(utils::send_device_command(light_state, device.light_id));
-	if resp.is_err() {
-		return Json(json!(
-			{"success":false,"error":resp.unwrap_err().to_string()}
-		));
-	}
-	if &resp.unwrap().header.get_code() == "4.04" {
-		return Json(json!(
-			{"success":false,"error":"device not found"}
-		));
-	}
-	//println!("{}", resp.unwrap().header.get_code());
-
-	return Json(json!({"success":true}));
+	return update_device(user_id, device_data.0, conn);
 }
 
 #[post("/set_brightness", format = "application/json", data = "<device_data>")]
-pub fn set_brightness(
-	mut conn: DbConn,
-	device_data: Json<DeviceData>,
-	user: AuthUser,
-) -> Json<Value> {
+pub fn set_brightness(conn: DbConn, device_data: Json<DeviceData>, user: AuthUser) -> Json<Value> {
 	let user_id = user.user_id;
-	let device = Light::get_device_by_id(device_data.device_id, &mut conn);
-	if device.is_none() {
-		return Json(json!({"success":false,"error":"Device does not exist"}));
-	}
-	if device_data.brightness.is_none() {
-		return Json(json!(
-			{"success":false,"error":"Invalid device brightness"}
-		));
-	}
-	let device = device.unwrap();
-	if user_id != device.user_id {
-		return Json(json!(
-			{"success":false,"error":"You are not the owner of the device"}
-		));
-	}
-	let update_result = Light::update_device_brightness(
-		device.light_id,
-		device_data.brightness.unwrap(),
-		&mut conn,
-		device.secret,
-		device.user_id,
-	);
-	let rt = Runtime::new().unwrap();
-	let light_state = LightState {
-		brightness: device_data.brightness.unwrap(),
-		color: device.rgb,
-		is_on: true,
-	};
-	let resp = rt.block_on(utils::send_device_command(light_state, device.light_id));
-	if resp.is_err() {
-		return Json(json!(
-			{"success":false,"error":resp.unwrap_err().to_string()}
-		));
-	}
-	return Json(json!({"success":true}));
+	return update_device(user_id, device_data.0, conn);
 }
 
 #[post("/register_device", format = "application/json", data = "<new_device>")]
@@ -238,4 +168,9 @@ pub fn register_device(
 	});
 
 	return Json(json! ({"status":200,"result":transaction_status.is_ok()}));
+}
+
+#[get("/is_online/<device_id>", format = "application/json")]
+pub fn check_device_online(mut conn: DbConn, device_id: String, user: AuthUser) -> Json<Value> {
+	Json(json!({}))
 }

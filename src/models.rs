@@ -248,6 +248,25 @@ impl Light {
 			.collect();
 		return data;
 	}
+
+	pub fn update_device(
+		light_id: Uuid,
+		light_state: &LightState,
+		db_conn: &mut PgConnection,
+		secret: String,
+		user_id: i32,
+	) -> Light {
+		let light_after_update = diesel::update(lights::table)
+			.set((
+				lights::is_on.eq(light_state.is_on),
+				lights::brightness.eq(light_state.brightness),
+				lights::rgb.eq(light_state.color),
+			))
+			.filter(lights::light_id.eq(light_id))
+			.get_result::<Light>(db_conn);
+		// todo implement error handling
+		return light_after_update.unwrap();
+	}
 }
 // this is to insert users to database
 #[derive(Serialize, Deserialize)]
