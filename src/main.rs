@@ -1,6 +1,5 @@
 #![feature(decl_macro, proc_macro_hygiene)]
 #![allow(proc_macro_derive_resolution_fallback, unused_attributes)]
-#![feature(mutex_unpoison)]
 
 extern crate diesel;
 extern crate dotenv;
@@ -23,10 +22,11 @@ use oath_routes::{
 	static_rocket_route_info_for_refresh, static_rocket_route_info_for_token, MyState,
 };
 use rocket::http::Method;
-use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors, CorsOptions};
+use rocket_cors::{AllowedOrigins, Cors, CorsOptions};
 use routes::{
 	device::{
-		static_rocket_route_info_for_get_devices, static_rocket_route_info_for_get_full_devices,
+		static_rocket_route_info_for_check_device_online, static_rocket_route_info_for_get_devices,
+		static_rocket_route_info_for_get_full_devices,
 		static_rocket_route_info_for_register_device, static_rocket_route_info_for_set_brightness,
 		static_rocket_route_info_for_set_color, static_rocket_route_info_for_set_on,
 	},
@@ -77,6 +77,7 @@ fn rocket() -> rocket::Rocket {
 				set_color,
 				set_on,
 				get_full_devices,
+				check_device_online,
 			],
 		)
 		.mount(
@@ -101,7 +102,9 @@ fn make_cors() -> Cors {
 		"http://localhost:3000".to_owned(),
 		//"http://localhost:8000",
 		"http://sikora-laptop.local:3000".to_owned(),
+		// "http://sikora-laptop.local:8080".to_owned(),
 		"http://sikora-laptop.local:8000".to_owned(),
+		"http://sikora-laptop.local:22070".to_owned(),
 	]);
 
 	CorsOptions {

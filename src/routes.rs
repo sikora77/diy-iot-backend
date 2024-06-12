@@ -1,3 +1,4 @@
+use crate::models::Device;
 use crate::utils::is_user_logged_in;
 
 use rocket::request::{self, FromRequest};
@@ -28,9 +29,20 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthUser {
 		}
 	}
 }
-
-#[derive(Serialize, Deserialize)]
-struct Response<Resp, Err> {
-	response: Option<Resp>,
-	errors: Option<Vec<Err>>,
+#[derive(Debug)]
+pub enum DeviceError {
+	DeviceNotOwned,
 }
+
+// #[derive(Serialize, Deserialize)]
+// struct Response<Resp, Err> {
+// 	response: Option<Resp>,
+// 	errors: Option<Vec<Err>>,
+// }
+
+// impl<'a, 'r> FromRequest<'a, 'r> for Device {
+// 	type Error = DeviceError;
+// 	fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+// 		request.
+// 	}
+// }

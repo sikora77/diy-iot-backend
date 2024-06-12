@@ -5,7 +5,7 @@ workers = 24
 log = "normal"
 limits = { forms = 32768 }
 [production]
-address = "0.0.0.0"
-port = 8000
+address = "sikora-laptop.local"
+port = 22070
 log = "normal"
 limits = { forms = 32768 }

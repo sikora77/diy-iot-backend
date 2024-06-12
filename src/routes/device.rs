@@ -8,10 +8,11 @@ use rocket_contrib::json::Json;
 use serde_json::Value;
 
 use tokio::runtime::Runtime;
+use uuid::Uuid;
 
 use crate::constants::{NON_RGB_LIGHT, RGB_LIGHT};
 
-use super::AuthUser;
+use super::{AuthUser, DeviceError};
 
 // Returns the devices owned by the user
 #[get("/devices")]
@@ -25,7 +26,6 @@ pub fn get_full_devices(mut conn: DbConn, user: AuthUser) -> Json<Value> {
 	let lights = Light::get_full_device_data_by_user(user.user_id, &mut conn);
 	return Json(json! ({"status":200,"lights":lights}));
 }
-
 fn update_device(user_id: i32, device_data: DeviceData, mut db_conn: DbConn) -> Json<Value> {
 	let device = Light::get_device_by_id(device_data.device_id, &mut db_conn);
 	if device.is_none() {
@@ -172,5 +172,32 @@ pub fn register_device(
 
 #[get("/is_online/<device_id>", format = "application/json")]
 pub fn check_device_online(mut conn: DbConn, device_id: String, user: AuthUser) -> Json<Value> {
-	Json(json!({}))
+	let user_id = user.user_id;
+	let device = Light::get_device_by_id(Uuid::parse_str(&device_id).unwrap(), &mut conn);
+	if device.is_none() {
+		return Json(json!({"success":false,"error":"Device does not exist"}));
+	}
+	let device = device.unwrap();
+	if user_id != device.user_id {
+		return Json(json!(
+			{"success":false,"error":"You are not the owner of the device"}
+		));
+	}
+	let rt = Runtime::new().unwrap();
+	let resp = rt.block_on(utils::check_device_online(device_id));
+	return match resp {
+		Some(value) => Json(json!({"isOnline":value,"success":true})),
+		None => Json(json!({"success":false})),
+	};
+}
+
+#[derive(Deserialize)]
+struct RenameData {
+	device_id: Uuid,
+	new_name: String,
+}
+#[post("/rename_device", format = "application/json", data = "<device_data>")]
+pub fn rename_device(conn: DbConn, device_data: Json<RenameData>, user: AuthUser) -> Json<Value> {
+	let user_id = user.user_id;
+	return Json(json!({}));
 }

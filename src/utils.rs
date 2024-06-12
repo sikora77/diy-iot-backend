@@ -3,13 +3,14 @@
 use std::env;
 
 use base64::{engine::general_purpose, Engine};
-use coap_client::{ClientOptions, HostOptions, RequestOptions, TokioClient};
+use coap_client::{backend::Tokio, ClientOptions, HostOptions, RequestOptions, TokioClient};
 use coap_lite::Packet;
 use diesel::{Connection, PgConnection};
 use dotenv::dotenv;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use openssl::{hash::MessageDigest, pkey::PKey, rsa::Rsa, sign::Verifier};
 use rocket::http::{Cookie, Cookies};
+use serde_json::Value;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
@@ -131,21 +132,25 @@ pub fn is_user_logged_in(cookies: Cookies) -> Option<i32> {
 	println!("{:?}", user_id);
 	user_id
 }
-
-pub async fn send_device_command(
-	light_state: LightState,
-	device_id: Uuid,
-) -> Result<Packet, coap_client::Error<std::io::Error>> {
+async fn create_client() -> coap_client::Client<std::io::Error, Tokio> {
 	let mut host_opts = HostOptions::default();
 	let ip = env::var("COAP_IP").expect("set COAP_IP");
 	let port = env::var("COAP_PORT").expect("set COAP_PORT");
 	host_opts.host = ip;
 	host_opts.port = port.parse().unwrap();
-	let mut req_opts = RequestOptions::default();
-	req_opts.non_confirmable = false;
-	let mut client = TokioClient::connect(host_opts, &ClientOptions::default())
+
+	return TokioClient::connect(host_opts, &ClientOptions::default())
 		.await
 		.unwrap();
+}
+
+pub async fn send_device_command(
+	light_state: LightState,
+	device_id: Uuid,
+) -> Result<Packet, coap_client::Error<std::io::Error>> {
+	let mut client = create_client().await;
+	let mut req_opts = RequestOptions::default();
+	req_opts.non_confirmable = false;
 	client
 		.put_and_get_packet(
 			format!("/lights/{}", device_id.to_string()).as_str(),
@@ -153,6 +158,30 @@ pub async fn send_device_command(
 			&req_opts,
 		)
 		.await
+}
+pub async fn check_device_online(device_id: String) -> Option<bool> {
+	// TODO handle errrors
+	let mut client = create_client().await;
+	let mut req_opts = RequestOptions::default();
+	req_opts.non_confirmable = false;
+	let response = client
+		.get(
+			format!("/lights/is_online/{}", device_id.to_string()).as_str(),
+			&req_opts,
+		)
+		.await;
+	if response.is_err() {
+		return None;
+	}
+	let message = String::from_utf8(response.unwrap());
+	let json_data = serde_json::from_str::<Value>(&message.unwrap());
+	json_data.unwrap()["isOnline"].as_bool()
+	// 	client
+	// 		.get(
+	// 			format!("/lights/is_online/{}", device_id.to_string()).as_str(),
+	// 			&req_opts,
+	// 		)
+	// 		.await
 }
 
 pub async fn create_coap_device(

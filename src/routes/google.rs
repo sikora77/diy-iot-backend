@@ -107,7 +107,7 @@ fn handle_sync(request_id: String, user_id: i32, mut conn: DbConn) -> GoogleResp
 				.filter(|trait_| trait_.is_some())
 				.map(|trait_| return trait_.clone().unwrap())
 				.collect();
-			return match device.type_.as_str().clone() {
+			return match device.type_.as_str() {
 				NON_RGB_LIGHT => {
 					let device_type = "action.devices.types.LIGHT".to_string();
 					Some(GoogleDevice {

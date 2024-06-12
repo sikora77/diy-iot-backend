@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-coap-client = { git = "https://github.com/sikora77/rust-coap-client.git", rev = "819af170f13063aa632f98f00e2a2029278e3d32" }
+coap-client = { git = "https://github.com/sikora77/rust-coap-client.git", rev = "b3ac627312f512fc6251f905590828ed3b320811" }
 rocket = { version = "0.4.4", features = ['private-cookies'] }
 rocket_codegen = "0.4.4"
 rocket_cors = "0.5.2"
@@ -21,7 +21,7 @@ base64 = "0.21.0"
 custom_derive = "0.1.7"
 oxide-auth-rocket = "0.1.0"
 oxide-auth = "0.5.3"
-jsonwebtoken = "8.2.0"
+jsonwebtoken = "9.3.0"
 serde_urlencoded = "0.7.1"
 chrono = "0.4.23"
 argon2 = "0.4"
@@ -32,8 +32,15 @@ tokio = "1.24.2"
 coap-lite = "0.9.0"
 futures = "0.3.25"
 coap = "0.12.0"
-openssl = "0.10.45"
+[target.'cfg(target_env = "musl")'.dependencies]
+openssl = { version = "0.10.45", features = ["vendored"] }
+[target.'cfg(target_env="gnu")'.dependencies]
+openssl = { version = "0.10.45" }
+
 [dependencies.rocket_contrib]
 version = "*"
 default-features = false
 features = ["json", "diesel_postgres_pool"]
+[build]
+rustflags = ["-L /usr/lib", "-l pq", "-C target-feature=-crt-static"]
+rustc-link-lib = ["ssl", "crypto"]
