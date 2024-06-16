@@ -80,4 +80,12 @@ impl Device {
 		}
 		Some(device.first().unwrap().user_id)
 	}
+	pub fn update_device_name(id: Uuid, new_name: &str, conn: &mut PgConnection) -> Device {
+		let device_after_update = diesel::update(devices::table)
+			.set(devices::name.eq(new_name))
+			.filter(devices::id.eq(id))
+			.get_result::<Device>(conn);
+		// todo implement error handling
+		return device_after_update.unwrap();
+	}
 }

@@ -205,7 +205,7 @@ pub fn rename_device(
 ) -> Json<Value> {
 	let user_id = user.user_id;
 	let device_id = device_data.device_id;
-	let device = Light::get_device_by_id(device_id, &mut conn);
+	let device = Device::get_device_by_id(device_id, &mut conn);
 	match device {
 		Some(dev) => {
 			if dev.user_id != user_id {
@@ -213,7 +213,7 @@ pub fn rename_device(
 					json!({"success":false,"error":"You are not the owner of the device"}),
 				);
 			}
-
+			Device::update_device_name(dev.id, &device_data.new_name, &mut conn);
 			return Json(json!({"success":true,"new_name":device_data.new_name}));
 		}
 		None => {

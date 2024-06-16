@@ -27,8 +27,9 @@ use routes::{
 	device::{
 		static_rocket_route_info_for_check_device_online, static_rocket_route_info_for_get_devices,
 		static_rocket_route_info_for_get_full_devices,
-		static_rocket_route_info_for_register_device, static_rocket_route_info_for_set_brightness,
-		static_rocket_route_info_for_set_color, static_rocket_route_info_for_set_on,
+		static_rocket_route_info_for_register_device, static_rocket_route_info_for_rename_device,
+		static_rocket_route_info_for_set_brightness, static_rocket_route_info_for_set_color,
+		static_rocket_route_info_for_set_on,
 	},
 	user::{
 		static_rocket_route_info_for_get_me, static_rocket_route_info_for_login,
@@ -78,6 +79,7 @@ fn rocket() -> rocket::Rocket {
 				set_on,
 				get_full_devices,
 				check_device_online,
+				rename_device
 			],
 		)
 		.mount(
