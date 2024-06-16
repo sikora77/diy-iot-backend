@@ -15,7 +15,7 @@ use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 use crate::{
-	models::{Device, LightState},
+	models::{device::Device, light::LightState},
 	routes::SESSION_STRING,
 	JWT_SECRET,
 };

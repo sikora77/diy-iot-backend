@@ -1,4 +1,3 @@
-use crate::models::Device;
 use crate::utils::is_user_logged_in;
 
 use rocket::request::{self, FromRequest};

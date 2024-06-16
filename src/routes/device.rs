@@ -1,7 +1,7 @@
 use crate::db::Conn as DbConn;
-use crate::models::{DeviceData, DeviceSignature, Light, LightState, Trait};
+use crate::models::{light::Light, light::LightState, light::Trait};
 
-use crate::models::{Device, NewDevice};
+use crate::models::device::{Device, DeviceData, DeviceSignature, NewDevice};
 use crate::utils::{self, create_coap_device};
 
 use rocket_contrib::json::Json;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::constants::{NON_RGB_LIGHT, RGB_LIGHT};
 
-use super::{AuthUser, DeviceError};
+use super::AuthUser;
 
 // Returns the devices owned by the user
 #[get("/devices")]
@@ -196,8 +196,29 @@ struct RenameData {
 	device_id: Uuid,
 	new_name: String,
 }
+#[allow(private_interfaces)]
 #[post("/rename_device", format = "application/json", data = "<device_data>")]
-pub fn rename_device(conn: DbConn, device_data: Json<RenameData>, user: AuthUser) -> Json<Value> {
+pub fn rename_device(
+	mut conn: DbConn,
+	device_data: Json<RenameData>,
+	user: AuthUser,
+) -> Json<Value> {
 	let user_id = user.user_id;
-	return Json(json!({}));
+	let device_id = device_data.device_id;
+	let device = Light::get_device_by_id(device_id, &mut conn);
+	match device {
+		Some(dev) => {
+			if dev.user_id != user_id {
+				return Json(
+					json!({"success":false,"error":"You are not the owner of the device"}),
+				);
+			}
+
+			return Json(json!({"success":true,"new_name":device_data.new_name}));
+		}
+		None => {
+			return Json(json!({"success":false,"error":"Device does not exist"}));
+		}
+	}
+	// return Json(json!({}));
 }

@@ -19,7 +19,7 @@ mod google_structs;
 mod jwt_issuer;
 #[path = "../utils.rs"]
 mod utils;
-use crate::models::{Device, Light};
+use crate::models::{device::Device, light::Light};
 use crate::oath_routes::MyState;
 
 use rocket_contrib::json::Json;

@@ -1,7 +1,6 @@
 use crate::db::Conn as DbConn;
-use crate::models::{Me, NewUser, RegisterUser, User};
+use crate::models::user::{LoginUser, Me, RegisterUser, User};
 
-use crate::models::LoginUser;
 use crate::utils::jwt_from_id;
 
 use rocket_contrib::json::Json;
