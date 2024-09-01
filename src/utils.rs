@@ -2,7 +2,7 @@
 
 use std::env;
 
-use base64::{engine::general_purpose, Engine};
+use base64::{alphabet::URL_SAFE, engine::general_purpose, Engine};
 use coap_client::{backend::Tokio, ClientOptions, HostOptions, RequestOptions, TokioClient};
 use coap_lite::Packet;
 use diesel::{Connection, PgConnection};
@@ -65,8 +65,14 @@ pub fn get_user_id_from_cookie(cookie: Option<&Cookie>) -> Option<i32> {
 	}
 	return Some(return_value.unwrap());
 }
-pub fn verify_secret(secret: String, data: String) -> bool {
-	let signature = &general_purpose::STANDARD_NO_PAD.decode(secret).unwrap();
+use anyhow::{anyhow, Error};
+pub fn verify_secret(secret: &str, data: String) -> Result<bool, Error> {
+	let engine = general_purpose::GeneralPurpose::new(&URL_SAFE, general_purpose::PAD);
+	let signature = engine.decode(secret);
+	if signature.is_err() {
+		return Err(anyhow!("Something went wrong with the input"));
+	}
+	let signature = &signature.unwrap();
 	let device_secret_key = Rsa::private_key_from_pem(
 		dotenv::var("DEVICE_SECRET_KEY")
 			.expect("set DEVICE_SECRET_KEY")
@@ -79,7 +85,7 @@ pub fn verify_secret(secret: String, data: String) -> bool {
 	let keypair = PKey::from_rsa(keypair).unwrap();
 	let mut verifier = Verifier::new(MessageDigest::sha256(), &keypair).unwrap();
 	verifier.update(data.as_bytes()).unwrap();
-	verifier.verify(&signature).unwrap()
+	Ok(verifier.verify(&signature).unwrap())
 }
 
 pub fn handle_startup() {

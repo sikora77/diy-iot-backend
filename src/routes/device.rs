@@ -106,9 +106,13 @@ pub fn register_device(
 		type_: new_device.type_.clone(),
 	};
 	let verified = utils::verify_secret(
-		new_device.secret.clone(),
+		&new_device.secret,
 		serde_json::to_string(&device_data).unwrap(),
 	);
+	if verified.is_err() {
+		return Json(json!({"error":"signature is wrong"}));
+	}
+	let verified = verified.unwrap();
 	println!("{}", verified);
 	if !verified {
 		return Json(json!({"error":"failed to authenticate device"}));
