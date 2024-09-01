@@ -1,3 +1,4 @@
+use crate::routes::device;
 use crate::schema::devices;
 use crate::schema::devices::dsl::devices as all_devices;
 use diesel;
@@ -7,6 +8,7 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Queryable, Insertable, Clone, Selectable)]
 #[diesel(belongs_to(User))]
+#[table_name = "devices"]
 pub struct Device {
 	pub id: Uuid,
 	pub type_: String,
@@ -53,7 +55,13 @@ impl Device {
 			.execute(conn)
 			.is_ok()
 	}
-
+	pub fn remove_device(device_id: Uuid, conn: &mut PgConnection) -> bool {
+		let s = diesel::delete(all_devices)
+			.filter(devices::id.eq(device_id))
+			.execute(conn)
+			.unwrap();
+		return s > 0;
+	}
 	pub fn get_devices_by_user(user_id: i32, conn: &mut PgConnection) -> Vec<Device> {
 		diesel::query_dsl::methods::FilterDsl::filter(all_devices, devices::user_id.eq(user_id))
 			.load::<Device>(conn)

@@ -65,24 +65,15 @@ pub fn get_user_id_from_cookie(cookie: Option<&Cookie>) -> Option<i32> {
 	}
 	return Some(return_value.unwrap());
 }
-use anyhow::{anyhow, Error};
-pub fn verify_secret(secret: &str, data: String) -> Result<bool, Error> {
+pub fn verify_secret(secret: &str, data: String) -> Result<bool, Box<dyn std::error::Error>> {
 	let engine = general_purpose::GeneralPurpose::new(&URL_SAFE, general_purpose::PAD);
-	let signature = engine.decode(secret);
-	if signature.is_err() {
-		return Err(anyhow!("Something went wrong with the input"));
-	}
-	let signature = &signature.unwrap();
+	let signature = &engine.decode(secret)?;
 	let device_secret_key = Rsa::private_key_from_pem(
 		dotenv::var("DEVICE_SECRET_KEY")
 			.expect("set DEVICE_SECRET_KEY")
 			.as_bytes(),
-	);
-	if device_secret_key.is_err() {
-		// return Json(json! ({"error":"something went wrong"}));
-	}
-	let keypair = device_secret_key.unwrap();
-	let keypair = PKey::from_rsa(keypair).unwrap();
+	)?;
+	let keypair = PKey::from_rsa(device_secret_key).unwrap();
 	let mut verifier = Verifier::new(MessageDigest::sha256(), &keypair).unwrap();
 	verifier.update(data.as_bytes()).unwrap();
 	Ok(verifier.verify(&signature).unwrap())

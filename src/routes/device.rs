@@ -1,7 +1,7 @@
 use crate::db::Conn as DbConn;
 use crate::models::{light::Light, light::LightState, light::Trait};
 
-use crate::models::device::{Device, DeviceData, DeviceSignature, NewDevice};
+use crate::models::device::{self, Device, DeviceData, DeviceSignature, NewDevice};
 use crate::utils::{self, create_coap_device};
 
 use rocket_contrib::json::Json;
@@ -105,6 +105,7 @@ pub fn register_device(
 		id: new_device.id,
 		type_: new_device.type_.clone(),
 	};
+	// TODO actually match the errors
 	let verified = utils::verify_secret(
 		&new_device.secret,
 		serde_json::to_string(&device_data).unwrap(),
@@ -225,4 +226,34 @@ pub fn rename_device(
 		}
 	}
 	// return Json(json!({}));
+}
+#[derive(Deserialize)]
+struct DeleteData {
+	device_id: Uuid,
+}
+#[allow(private_interfaces)]
+#[post("/remove_device", format = "application/json", data = "<device_data>")]
+pub fn remove_device(
+	mut conn: DbConn,
+	device_data: Json<DeleteData>,
+	user: AuthUser,
+) -> Json<Value> {
+	let user_id = user.user_id;
+	let device_id = device_data.device_id;
+	let device = Device::get_device_by_id(device_id, &mut conn);
+	match device {
+		Some(dev) => {
+			if dev.user_id != user_id {
+				return Json(
+					json!({"success":false,"error":"You are not the owner of the device"}),
+				);
+			}
+			if Device::remove_device(device_id, &mut conn) {
+				return Json(json!({"success":"true"}));
+			} else {
+				return Json(json!({"success":false,"error":"something went wrong"}));
+			}
+		}
+		None => return Json(json!({"success":false,"error":"Device does not exist"})),
+	}
 }
