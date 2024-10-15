@@ -77,6 +77,13 @@ impl Light {
 			user_id,
 		};
 	}
+	pub fn remove_device(light_id: Uuid, conn: &mut PgConnection) -> bool {
+		let s = diesel::delete(all_lights)
+			.filter(lights::light_id.eq(light_id))
+			.execute(conn)
+			.unwrap();
+		return s > 0;
+	}
 	pub fn insert_device(
 		_light_id: Uuid,
 		conn: &mut PgConnection,

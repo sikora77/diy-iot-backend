@@ -241,6 +241,7 @@ pub fn remove_device(
 	let user_id = user.user_id;
 	let device_id = device_data.device_id;
 	let device = Device::get_device_by_id(device_id, &mut conn);
+	let light = Light::get_device_by_id(device_id, &mut conn);
 	match device {
 		Some(dev) => {
 			if dev.user_id != user_id {
