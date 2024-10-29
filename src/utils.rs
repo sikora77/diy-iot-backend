@@ -156,6 +156,20 @@ pub async fn send_device_command(
 		)
 		.await
 }
+pub async fn remove_coap_device(
+	device_id: Uuid,
+) -> Result<Packet, coap_client::Error<std::io::Error>> {
+	let mut client = create_client().await;
+	let mut req_opts = RequestOptions::default();
+	req_opts.non_confirmable = false;
+	client
+		.put_and_get_packet(
+			format!("/lights/remove/{}", device_id.to_string()).as_str(),
+			None,
+			&req_opts,
+		)
+		.await
+}
 pub async fn check_device_online(device_id: String) -> Option<bool> {
 	// TODO handle errrors
 	let mut client = create_client().await;

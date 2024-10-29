@@ -2,7 +2,7 @@ use crate::db::Conn as DbConn;
 use crate::models::{light::Light, light::LightState, light::Trait};
 
 use crate::models::device::{self, Device, DeviceData, DeviceSignature, NewDevice};
-use crate::utils::{self, create_coap_device};
+use crate::utils::{self, create_coap_device, remove_coap_device};
 
 use rocket_contrib::json::Json;
 use serde_json::Value;
@@ -42,6 +42,7 @@ fn update_device(user_id: i32, device_data: DeviceData, mut db_conn: DbConn) -> 
         brightness: device.brightness,
         color: device.rgb,
         is_on: device.is_on,
+        removed:false,
     };
     light_state.brightness = match device_data.brightness {
         Some(brightness) => brightness,
@@ -266,8 +267,10 @@ pub fn remove_device(
     if device_status.is_some() {
         return device_status.unwrap();
     }
+    let mut light_id: Uuid;
     let light_status = match light {
         Some(light_dev) => {
+            light_id = light_dev.light_id;
             if light_dev.user_id != user_id {
                 Some(Json(
                     json!({"success":false,"error":"You are not the owner of the device"})
@@ -285,5 +288,10 @@ pub fn remove_device(
     if light_status.is_some() {
         return light_status.unwrap();
     }
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async {
+        // TODO Check this later
+        remove_coap_device(light_id).await;
+    });
     Json(json!({"success":true}))
 }
